@@ -43,7 +43,7 @@ impl DockerCompose {
         let mut cmd = Command::new("docker");
         cmd.arg("info")
             .arg("--format")
-            .arg("{{.OSType}}/{{.Architecture}}");
+            .arg("{{.Version.OsArch}}");
 
         get_cmd_output(cmd, "Get os arch".to_string())
             .trim()
@@ -86,8 +86,31 @@ impl DockerCompose {
 
         get_cmd_output(cmd, format!("Get container ip of {container_name}"))
             .trim()
-            .to_string()
+            .to_string();
+        let ip = String::from("127.0.0.1");
+        ip
     }
+
+    pub fn get_container_port(&self, service_name: impl AsRef<str>) -> String {
+        let container_name = format!("{}-{}-1", self.project_name, service_name.as_ref());
+        let mut cmd = Command::new("docker");
+        cmd.arg("port")
+            .arg(&container_name)
+            .arg("9000");
+
+        let addr_and_port = get_cmd_output(cmd, format!("Get port of {container_name}"))
+            .trim()
+            .to_string();
+
+        let parts: Vec<&str> = addr_and_port.split(':').collect();
+        if parts.len() == 2 {
+            // Convert the IP part from &str to String and return it
+            parts[1].to_string()
+        } else {
+            // Return None if the format is invalid
+            parts[0].to_string()
+        }
+        }
 }
 
 impl Drop for DockerCompose {
