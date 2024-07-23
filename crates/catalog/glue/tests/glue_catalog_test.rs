@@ -56,15 +56,17 @@ fn after_all() {
 async fn get_catalog() -> GlueCatalog {
     set_up();
 
-    let (glue_catalog_ip, minio_ip) = {
+    let glue_catalog_ip = "127.0.0.1";
+    let minio_ip = "127.0.0.1";
+    let (glue_catalog_port_new, minio_port_new) = {
         let guard = DOCKER_COMPOSE_ENV.read().unwrap();
         let docker_compose = guard.as_ref().unwrap();
         (
-            docker_compose.get_container_ip("moto"),
-            docker_compose.get_container_ip("minio"),
+            docker_compose.get_container_port("moto", GLUE_CATALOG_PORT),
+            docker_compose.get_container_port("minio", MINIO_PORT),
         )
     };
-    let read_port = format!("{}:{}", glue_catalog_ip, GLUE_CATALOG_PORT);
+    let read_port = format!("{}:{}", glue_catalog_ip, glue_catalog_port_new);
     loop {
         if !scan_port_addr(&read_port) {
             log::info!("Waiting for 1s glue catalog to ready...");
@@ -83,7 +85,7 @@ async fn get_catalog() -> GlueCatalog {
         (AWS_REGION_NAME.to_string(), "us-east-1".to_string()),
         (
             S3_ENDPOINT.to_string(),
-            format!("http://{}:{}", minio_ip, MINIO_PORT),
+            format!("http://{}:{}", minio_ip, minio_port_new),
         ),
         (S3_ACCESS_KEY_ID.to_string(), "admin".to_string()),
         (S3_SECRET_ACCESS_KEY.to_string(), "password".to_string()),
@@ -91,7 +93,7 @@ async fn get_catalog() -> GlueCatalog {
     ]);
 
     let config = GlueCatalogConfig::builder()
-        .uri(format!("http://{}:{}", glue_catalog_ip, GLUE_CATALOG_PORT))
+        .uri(format!("http://{}:{}", glue_catalog_ip, glue_catalog_port_new))
         .warehouse("s3a://warehouse/hive".to_string())
         .props(props.clone())
         .build();

@@ -86,17 +86,15 @@ impl DockerCompose {
 
         get_cmd_output(cmd, format!("Get container ip of {container_name}"))
             .trim()
-            .to_string();
-        let ip = String::from("127.0.0.1");
-        ip
+            .to_string()
     }
 
-    pub fn get_container_port(&self, service_name: impl AsRef<str>) -> String {
+    pub fn get_container_port(&self, service_name: impl AsRef<str>, port: u16) -> String {
         let container_name = format!("{}-{}-1", self.project_name, service_name.as_ref());
         let mut cmd = Command::new("docker");
         cmd.arg("port")
             .arg(&container_name)
-            .arg("9000");
+            .arg(port.to_string());
 
         let addr_and_port = get_cmd_output(cmd, format!("Get port of {container_name}"))
             .trim()
@@ -110,7 +108,7 @@ impl DockerCompose {
             // Return None if the format is invalid
             parts[0].to_string()
         }
-        }
+    }
 }
 
 impl Drop for DockerCompose {

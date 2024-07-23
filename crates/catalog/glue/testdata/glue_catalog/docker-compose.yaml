@@ -18,7 +18,7 @@
 services:
   minio:
     image: minio/minio:RELEASE.2024-03-07T00-43-48Z
-    expose:
+    ports:
       - 9000
       - 9001
     environment:
@@ -40,5 +40,5 @@ services:
 
   moto:
     image: motoserver/moto:5.0.3
-    expose:
+    ports:
       - 5000

@@ -49,8 +49,8 @@ async fn get_file_io() -> FileIO {
 
     let guard = DOCKER_COMPOSE_ENV.read().unwrap();
     let docker_compose = guard.as_ref().unwrap();
-    let container_ip = docker_compose.get_container_ip("minio");
-    let port = docker_compose.get_container_port("minio");
+    let container_ip = "127.0.0.1";
+    let port = docker_compose.get_container_port("minio", 9000);
     let read_port = format!("{}:{}", container_ip, port);
 
     FileIOBuilder::new("s3")
@@ -76,29 +76,29 @@ async fn test_file_io_s3_is_exist() {
     assert!(file_io.is_exist("s3://bucket1/").await.unwrap());
 }
 
-// #[tokio::test]
-// async fn test_file_io_s3_output() {
-//     let file_io = get_file_io().await;
-//     assert!(!file_io.is_exist("s3://bucket1/test_output").await.unwrap());
-//     let output_file = file_io.new_output("s3://bucket1/test_output").unwrap();
-//     {
-//         output_file.write("123".into()).await.unwrap();
-//     }
-//     assert!(file_io.is_exist("s3://bucket1/test_output").await.unwrap());
-// }
+#[tokio::test]
+async fn test_file_io_s3_output() {
+    let file_io = get_file_io().await;
+    assert!(!file_io.is_exist("s3://bucket1/test_output").await.unwrap());
+    let output_file = file_io.new_output("s3://bucket1/test_output").unwrap();
+    {
+        output_file.write("123".into()).await.unwrap();
+    }
+    assert!(file_io.is_exist("s3://bucket1/test_output").await.unwrap());
+}
 
-// #[tokio::test]
-// async fn test_file_io_s3_input() {
-//     let file_io = get_file_io().await;
-//     let output_file = file_io.new_output("s3://bucket1/test_input").unwrap();
-//     {
-//         output_file.write("test_input".into()).await.unwrap();
-//     }
+#[tokio::test]
+async fn test_file_io_s3_input() {
+    let file_io = get_file_io().await;
+    let output_file = file_io.new_output("s3://bucket1/test_input").unwrap();
+    {
+        output_file.write("test_input".into()).await.unwrap();
+    }
 
-//     let input_file = file_io.new_input("s3://bucket1/test_input").unwrap();
+    let input_file = file_io.new_input("s3://bucket1/test_input").unwrap();
 
-//     {
-//         let buffer = input_file.read().await.unwrap();
-//         assert_eq!(buffer, "test_input".as_bytes());
-//     }
-// }
+    {
+        let buffer = input_file.read().await.unwrap();
+        assert_eq!(buffer, "test_input".as_bytes());
+    }
+}
