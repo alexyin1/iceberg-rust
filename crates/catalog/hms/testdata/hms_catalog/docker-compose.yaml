@@ -18,7 +18,7 @@
 services:
   minio:
     image: minio/minio:RELEASE.2024-03-07T00-43-48Z
-    expose:
+    ports:
       - 9000
       - 9001
     environment:
@@ -42,7 +42,7 @@ services:
     image: iceberg-hive-metastore
     build: ./
     platform: ${DOCKER_DEFAULT_PLATFORM}
-    expose:
+    ports:
       - 9083
     environment:
       SERVICE_NAME: "metastore"

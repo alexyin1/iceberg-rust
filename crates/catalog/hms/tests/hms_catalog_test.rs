@@ -55,30 +55,21 @@ fn after_all() {
 async fn get_catalog() -> HmsCatalog {
     set_up();
 
-    let (hms_catalog_ip, minio_ip) = {
-        let guard = DOCKER_COMPOSE_ENV.read().unwrap();
-        let docker_compose = guard.as_ref().unwrap();
-        (
-            docker_compose.get_container_ip("hive-metastore"),
-            docker_compose.get_container_ip("minio"),
-        )
-    };
+    let guard = DOCKER_COMPOSE_ENV.read().unwrap();
+    let docker_compose = guard.as_ref().unwrap();
+    let hms_catalog_socket = docker_compose.get_container_socket("hive-metastore", HMS_CATALOG_PORT);
+    let minio_socket = docker_compose.get_container_socket("minio", MINIO_PORT);
 
-    let read_port = format!("{}:{}", hms_catalog_ip, HMS_CATALOG_PORT);
-    loop {
-        if !scan_port_addr(&read_port) {
-            log::info!("scan read_port {} check", read_port);
-            log::info!("Waiting for 1s hms catalog to ready...");
-            sleep(std::time::Duration::from_millis(1000)).await;
-        } else {
-            break;
-        }
+    while !scan_port_addr(hms_catalog_socket) {
+        log::info!("scan read_port {} check", hms_catalog_socket);
+        log::info!("Waiting for 1s hms catalog to ready...");
+        sleep(std::time::Duration::from_millis(1000)).await;
     }
 
     let props = HashMap::from([
         (
             S3_ENDPOINT.to_string(),
-            format!("http://{}:{}", minio_ip, MINIO_PORT),
+            format!("http://{}", minio_socket.to_string()),
         ),
         (S3_ACCESS_KEY_ID.to_string(), "admin".to_string()),
         (S3_SECRET_ACCESS_KEY.to_string(), "password".to_string()),
@@ -86,7 +77,7 @@ async fn get_catalog() -> HmsCatalog {
     ]);
 
     let config = HmsCatalogConfig::builder()
-        .address(format!("{}:{}", hms_catalog_ip, HMS_CATALOG_PORT))
+        .address(format!("{}", hms_catalog_socket.to_string()))
         .thrift_transport(HmsThriftTransport::Buffered)
         .warehouse("s3a://warehouse/hive".to_string())
         .props(props)
