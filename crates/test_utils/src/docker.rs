@@ -17,7 +17,7 @@
 
 use crate::cmd::{get_cmd_output, run_command};
 use std::process::Command;
-use std::net::{SocketAddr, is_unspecified};
+use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 
 #[derive(Debug)]
 enum EngineProvider {
@@ -99,7 +99,7 @@ impl DockerCompose {
         )
     }
 
-    pub fn get_container_ip(&self, service_name: impl AsRef<str>) -> String {
+    pub fn get_container_ip(&self, service_name: impl AsRef<str>) -> IpAddr {
         let container_name = format!("{}-{}-1", self.project_name, service_name.as_ref());
         let mut cmd = Command::new("docker");
         cmd.arg("inspect")
@@ -107,12 +107,13 @@ impl DockerCompose {
             .arg("{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}")
             .arg(&container_name);
 
-        get_cmd_output(cmd, format!("Get container ip of {container_name}"))
+        let ip_addr_str = get_cmd_output(cmd, format!("Get container ip of {container_name}"))
             .trim()
-            .to_string()
+            .to_string();
+        ip_addr_str.parse::<IpAddr>().expect(&format!("Failed to parse {} container's IP", container_name))
     }
 
-    pub fn get_mapped_container_socket(&self, service_name: impl AsRef<str>, unmapped_port: u16) -> (String, u16) {
+    pub fn get_mapped_container_socket(&self, service_name: impl AsRef<str>, unmapped_port: u16) -> SocketAddr {
         let container_name = format!("{}-{}-1", self.project_name, service_name.as_ref());
         let mut cmd = Command::new("docker");
         cmd.arg("port")
@@ -126,17 +127,17 @@ impl DockerCompose {
             .expect("Unable to parse socket address");
 
         if mapped_socket.ip().is_unspecified() {
-            (String::from("127.0.0.1"), mapped_socket.port())
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), mapped_socket.port())
         } else {
-            (mapped_socket.ip().to_string(), mapped_socket.port())
+            mapped_socket
         }
     }
 
-    pub fn get_container_socket(&self, service_name: impl AsRef<str>, unmapped_port: u16) -> (String, u16) {
+    pub fn get_container_socket(&self, service_name: impl AsRef<str>, unmapped_port: u16) -> SocketAddr {
         match self.engine_provider {
             // docker containers always get an addressable IP, so no portforwarding
             EngineProvider::Docker => {
-                (self.get_container_ip(service_name), unmapped_port)
+                SocketAddr::new(self.get_container_ip(service_name), unmapped_port)
             }
             // podman rootless containers don't get an IP by default.
             // Instead, they share host IP and forward container ports to the host.

@@ -49,13 +49,11 @@ async fn get_file_io() -> FileIO {
 
     let guard = DOCKER_COMPOSE_ENV.read().unwrap();
     let docker_compose = guard.as_ref().unwrap();
-    let container_ip = "127.0.0.1";
-    let port = docker_compose.get_container_port("minio", 9000);
-    let read_port = format!("{}:{}", container_ip, port);
+    let minio_socket = docker_compose.get_container_socket("minio", 9000);
 
     FileIOBuilder::new("s3")
         .with_props(vec![
-            (S3_ENDPOINT, format!("http://{}", read_port)),
+            (S3_ENDPOINT, format!("http://{}", minio_socket.to_string())),
             (S3_ACCESS_KEY_ID, "admin".to_string()),
             (S3_SECRET_ACCESS_KEY, "password".to_string()),
             (S3_REGION, "us-east-1".to_string()),
