@@ -41,9 +41,9 @@ impl DockerCompose {
 
     fn get_os_arch() -> String {
         let mut cmd = Command::new("docker");
-        cmd.arg("info")
+        cmd.arg("version")
             .arg("--format")
-            .arg("{{.Version.OsArch}}");
+            .arg("{{.Server.OsArch}}");
 
         get_cmd_output(cmd, "Get os arch".to_string())
             .trim()
