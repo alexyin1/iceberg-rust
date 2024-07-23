@@ -17,6 +17,13 @@
 
 use crate::cmd::{get_cmd_output, run_command};
 use std::process::Command;
+use std::net::{SocketAddr, is_unspecified};
+
+#[derive(Debug)]
+enum EngineProvider {
+    Docker,
+    Podman
+}
 
 /// A utility to manage the lifecycle of `docker compose`.
 ///
@@ -25,6 +32,21 @@ use std::process::Command;
 pub struct DockerCompose {
     project_name: String,
     docker_compose_dir: String,
+    engine_provider: EngineProvider
+}
+
+fn get_engine_provider() -> EngineProvider {
+    let mut cmd = Command::new("docker");
+    cmd.arg("--version");
+    let vers_str = get_cmd_output(cmd, format!("Get engine provider"))
+        .trim()
+        .to_lowercase()
+        .to_string();
+    if vers_str.contains("podman") {
+        EngineProvider::Podman
+    } else {
+        EngineProvider::Docker
+    }
 }
 
 impl DockerCompose {
@@ -32,6 +54,7 @@ impl DockerCompose {
         Self {
             project_name: project_name.to_string(),
             docker_compose_dir: docker_compose_dir.to_string(),
+            engine_provider: get_engine_provider()
         }
     }
 
@@ -89,24 +112,37 @@ impl DockerCompose {
             .to_string()
     }
 
-    pub fn get_container_port(&self, service_name: impl AsRef<str>, port: u16) -> String {
+    pub fn get_mapped_container_socket(&self, service_name: impl AsRef<str>, unmapped_port: u16) -> (String, u16) {
         let container_name = format!("{}-{}-1", self.project_name, service_name.as_ref());
         let mut cmd = Command::new("docker");
         cmd.arg("port")
             .arg(&container_name)
-            .arg(port.to_string());
+            .arg(unmapped_port.to_string());
 
-        let addr_and_port = get_cmd_output(cmd, format!("Get port of {container_name}"))
+        let mapped_socket: SocketAddr = get_cmd_output(cmd, format!("Get port mapping for {container_name}"))
             .trim()
-            .to_string();
+            .to_string()
+            .parse()
+            .expect("Unable to parse socket address");
 
-        let parts: Vec<&str> = addr_and_port.split(':').collect();
-        if parts.len() == 2 {
-            // Convert the IP part from &str to String and return it
-            parts[1].to_string()
+        if mapped_socket.ip().is_unspecified() {
+            (String::from("127.0.0.1"), mapped_socket.port())
         } else {
-            // Return None if the format is invalid
-            parts[0].to_string()
+            (mapped_socket.ip().to_string(), mapped_socket.port())
+        }
+    }
+
+    pub fn get_container_socket(&self, service_name: impl AsRef<str>, unmapped_port: u16) -> (String, u16) {
+        match self.engine_provider {
+            // docker containers always get an addressable IP, so no portforwarding
+            EngineProvider::Docker => {
+                (self.get_container_ip(service_name), unmapped_port)
+            }
+            // podman rootless containers don't get an IP by default.
+            // Instead, they share host IP and forward container ports to the host.
+            EngineProvider::Podman => {
+                self.get_mapped_container_socket(service_name, unmapped_port)
+            }
         }
     }
 }
